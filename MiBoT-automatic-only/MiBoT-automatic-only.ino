@@ -10,16 +10,16 @@
 
 
 //Hardware pins
-#define EN 14
-#define ad0 25
-#define ad1 26
-#define RX 15
-#define TX 4
-#define battery 36
-#define encoderL1 37
-#define encoderR1 38
-#define encoderL2 39
-#define encoderR2 35
+#define EN 14 // driver enable pin
+#define ad0 25 // driver adress pin
+#define ad1 26 // driver adress pin
+#define RX 15 // driver RX pin
+#define TX 4 // driver TX pin
+#define battery 36 // battery reading pin
+#define encoderL1 38 // encoder on left motor (yellow wire)
+#define encoderR1 37 // encoder on right motor (yellow wire)
+#define encoderL2 35 // encoder on left motor (white wire)
+#define encoderR2 39 // encoder on right motor (white wire)
 
 //Hardware serial for UART communication on LoPy
 HardwareSerial mySerial(1);
@@ -43,10 +43,6 @@ double dt,dtPrec;
 double angleerror=0;
 double gyroXerror,gyroYerror,gyroZerror;
 
-
-
-
-
 //object for automatic control
 volatile double vconsigne=0;
 double ev[3]={0,0,0};
@@ -64,18 +60,11 @@ uint32_t timer1;
 uint32_t timer2;
 
 // timer for calculate phase with encoder
-double timerLprec;
-double timerRprec;
-double posL=0;
-double posR=0;
+double posL=0; //position angulaire roue gauche en radian
+double posR=0; //position angulaire roue droite en radian
 double posprecL=0;
 double posprecR=0;
 const double R=0.021;
-double phaseL=0;
-double phaseR=0;
-double TencodL=0;
-double TencodR=0;
-short int sensL,sensR;
 
 //timer for automatic control
 hw_timer_t * timerA = NULL;
@@ -103,15 +92,14 @@ void setup(){
   //set encoder position functions
   attachInterrupt(digitalPinToInterrupt(encoderL1), encoderChangeL1, RISING);
   attachInterrupt(digitalPinToInterrupt(encoderR1), encoderChangeR1, RISING);
-  attachInterrupt(digitalPinToInterrupt(encoderL2), encoderChangeL2, RISING);
-  attachInterrupt(digitalPinToInterrupt(encoderR2), encoderChangeR2, RISING);
+  //attachInterrupt(digitalPinToInterrupt(encoderL2), encoderChangeL2, RISING);
+  //attachInterrupt(digitalPinToInterrupt(encoderR2), encoderChangeR2, RISING);
 
   //timer for automatic control flag
   timerA = timerBegin(0, 80, true); //prescaler : 80e6/80 = 1e6 (ESP32 : 80MHz)
   timerAttachInterrupt(timerA, &onTime, true);
   timerAlarmWrite(timerA, 10000, true); //for 100Hz : 100=1e6/1e4     
   timerAlarmEnable(timerA);
-  
 
   //UART communication
   Serial1.begin(115200, SERIAL_8N1, RX, TX);
@@ -135,15 +123,16 @@ void setup(){
   timer1=millis();
   timer2=millis();
   dtPrec=micros()/1e6;
-  timerLprec=micros()/1e6;
-  timerRprec=micros()/1e6;
+
   
 }
 
 void loop(){
-
+  
+  //runMotors(0,70); //runMotor(rightM pwn, leftM pwm)
   //Serial.print(phaseL); Serial.print("\t\t"); Serial.println(phaseR);
-  //delay(200);
+  Serial.print(posL); Serial.print("\t\t"); Serial.println(posR);
+  delay(200);
   if(flag){ 
     //Serial.println(millis());
     
@@ -161,41 +150,22 @@ void IRAM_ATTR onTime() {
 
 //encoder functions
 void encoderChangeL1(){
+  if (digitalRead(encoderL2))
+    posL -= 2*PI/(3*150.58); //position angulaire roue gauche en radian
+  else
+    posL += 2*PI/(3*150.58);
 
-  TencodL = (micros()/1e6)-timerLprec;
-  timerLprec = micros()/1e6;
-
-  posL += sensL * (1/(3*150.58));
-  //Serial.println("encoder L1");
 }
 
 void encoderChangeR1(){
-  TencodR = (micros()/1e6)-timerRprec;
-  timerRprec = micros()/1e6;
-  posR += sensR * (1/(3*150.58));
-  //Serial.println("encoder R1");
+  if (digitalRead(encoderR2))
+    posR += 2*PI/(3*150.58); //position angulaire roue droite en radian
+  else
+    posR -= 2*PI/(3*150.58);
+
 }
 
-void encoderChangeL2(){
-  if (TencodL != 0)
-    phaseL = 360*((micros()/1e6)-timerLprec)/TencodL;
-  if (phaseL>180)
-    sensL = -1;
-  else
-    sensL = 1;
-    
-  //Serial.println("encoder L2");
-}
 
-void encoderChangeR2(){
-  if (TencodR != 0)
-    phaseR = 360*((micros()/1e6)-timerRprec)/TencodR;
-  if (phaseR<180)
-    sensR = -1;
-  else
-    sensR = 1;
-  //Serial.println("encoder R2");
-}
 
 
 
