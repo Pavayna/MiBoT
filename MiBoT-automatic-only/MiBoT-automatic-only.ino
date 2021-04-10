@@ -75,6 +75,7 @@ double phaseL=0;
 double phaseR=0;
 double TencodL=0;
 double TencodR=0;
+short int sensL,sensR;
 
 //timer for automatic control
 hw_timer_t * timerA = NULL;
@@ -144,7 +145,7 @@ void loop(){
   //Serial.print(phaseL); Serial.print("\t\t"); Serial.println(phaseR);
   //delay(200);
   if(flag){ 
-    Serial.println(millis());
+    //Serial.println(millis());
     
     /* ecrire le code d'asservissement ici*/
     
@@ -164,30 +165,35 @@ void encoderChangeL1(){
   TencodL = (micros()/1e6)-timerLprec;
   timerLprec = micros()/1e6;
 
-  posL+=(1/(3*150.58));
+  posL += sensL * (1/(3*150.58));
   //Serial.println("encoder L1");
 }
 
 void encoderChangeR1(){
   TencodR = (micros()/1e6)-timerRprec;
   timerRprec = micros()/1e6;
-  posR+=(1/(3*150.58));
+  posR += sensR * (1/(3*150.58));
   //Serial.println("encoder R1");
 }
 
 void encoderChangeL2(){
-  if (TencodL != 0){
-    phaseL=360*((micros()/1e6)-timerLprec)/TencodL;
-  }
+  if (TencodL != 0)
+    phaseL = 360*((micros()/1e6)-timerLprec)/TencodL;
+  if (phaseL>180)
+    sensL = -1;
+  else
+    sensL = 1;
+    
   //Serial.println("encoder L2");
-
-  
 }
 
 void encoderChangeR2(){
-  if (TencodR != 0){
-    phaseR=360*((micros()/1e6)-timerRprec)/TencodR;
-  }
+  if (TencodR != 0)
+    phaseR = 360*((micros()/1e6)-timerRprec)/TencodR;
+  if (phaseR<180)
+    sensR = -1;
+  else
+    sensR = 1;
   //Serial.println("encoder R2");
 }
 
