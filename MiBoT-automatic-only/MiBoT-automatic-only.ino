@@ -1,6 +1,7 @@
 #include "CRC.h"
 #include "TMC7300_Register.h"
 #include <HardwareSerial.h>
+#include <Arduino.h>
 #include <Wire.h> //Wire lib for I2C communication
 #include <Kalman.h> // Source: https://github.com/TKJElectronics/KalmanFilter
 #include <Adafruit_NeoPixel.h> // for the lopy RGB led control source : https://github.com/adafruit/Adafruit_NeoPixel
@@ -75,6 +76,13 @@ double phaseR=0;
 double TencodL=0;
 double TencodR=0;
 
+//timer for automatic control
+hw_timer_t * timerA = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+volatile bool flag=false;
+void IRAM_ATTR onTime();
+
+
 void setup(){
   delay(100);
   //hardware pin
@@ -97,14 +105,17 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(encoderL2), encoderChangeL2, RISING);
   attachInterrupt(digitalPinToInterrupt(encoderR2), encoderChangeR2, RISING);
 
+  //timer for automatic control flag
+  timerA = timerBegin(0, 80, true); //prescaler : 80e6/80 = 1e6 (ESP32 : 80MHz)
+  timerAttachInterrupt(timerA, &onTime, true);
+  timerAlarmWrite(timerA, 10000, true); //for 100Hz : 100=1e6/1e4     
+  timerAlarmEnable(timerA);
+  
+
   //UART communication
   Serial1.begin(115200, SERIAL_8N1, RX, TX);
   //Serial communication with computer
   Serial.begin(115200);
-
-  //initialize object for led control
-
-  
 
   
   //Driver setup
@@ -129,75 +140,23 @@ void setup(){
 }
 
 void loop(){
-  runMotors(-50,-50);
-  Serial.print(phaseL); Serial.print("\t\t"); Serial.println(phaseR);
-  delay(200);
+
+  //Serial.print(phaseL); Serial.print("\t\t"); Serial.println(phaseR);
+  //delay(200);
+  if(flag){ 
+    Serial.println(millis());
+    
+    /* ecrire le code d'asservissement ici*/
+    
+    flag=false;
+  }
   
-  //tesk running on core 1
-  /*if (millis()-timer1>=10.0){ //sample time : 10ms
-      double vmesure,dta,eteta;
-
-      //getting the inclinason angle of the robot
-      readValues();
-      getAngles();
-      
-      dta=(micros()/1e6)-dtPrec;
-      
-      vmesure=(posR-posprecR)*21e-3/dta; //estimation de la vitesse avec la position d'un des moteurs
-      
-      posprecR=posR;
   
-      ev[0]=vconsigne-vmesure;
-
-      tetar[0]=-0.006502*ev[1]+0.006491*ev[2]+1.991*tetar[1]-0.9913*tetar[2]; //correcteur de vitesse
-      
-      ev[2]=ev[1];
-      ev[1]=ev[0];
-      tetar[2]=tetar[1];
-      tetar[1]=tetar[0];
-      
-      eteta=tetar[0]-kalAngleY;
-      etetaSum+=eteta;
-  
-      cmd=(Kp*eteta+Ki*etetaSum+Kd*eteta/dta)/700e3;
-      if (cmd>0)
-        cmd+=50;
-      if (cmd<-0)
-        cmd-=50;
-      
-      dtPrec=micros()/1e6;
-      
-      //Serial.print(cmd); Serial.print("\t");
-      
-      //les deux moteurs ne tournent pas à la meme vitesse 
-      double cmd2=(0.724*abs(cmd)-3.77+8.38)/0.708; //cette equation permet au 2e moteur de tourner à peu pres a la meme vitesse que le premier
-      if (cmd<0)
-        cmd2=-cmd2;
-
-
-      //satutation 
-      if (cmd>255)
-        cmd=255;
-      if (cmd<-255)
-        cmd=-255;
-
-      if (cmd2>255)
-        cmd2=255;
-      if (cmd2<-255)
-        cmd2=-255;
-      
-      //Serial.println(cmd);
-      
-      timer1=millis();
-      runMotors(cmd2,cmd); //commande envoyee aux deux moteurs
-     }*/
 }
 
-
-//encoder object
-
-
-//
+void IRAM_ATTR onTime() {
+   flag=true;
+}
 
 //encoder functions
 void encoderChangeL1(){
