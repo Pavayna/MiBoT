@@ -20,7 +20,7 @@
 #define encoderR1 37 // encoder on right motor (yellow wire)
 #define encoderL2 35 // encoder on left motor (white wire)
 #define encoderR2 39 // encoder on right motor (white wire)
-#define out 26 //pin test periode echantillonage
+#define out 33 //pin test periode echantillonage
 
 //Hardware serial for UART communication on LoPy
 HardwareSerial mySerial(1);
@@ -47,18 +47,26 @@ double gyroXerror,gyroYerror,gyroZerror;
 //object for automatic control
 volatile double vconsigne=0;
 double ev[3]={0,0,0};
-double tetar[3]={0,0,0};
+double tetam[3]={0,0,0};
 float cmd[3] = {0,0,0};
 double etetaSum=0;
+double ui[2] = {0,0};
+double ud[2] = {0,0};
 
-const double Kp=-20.2617;
+/*const double Kp=-20.2617;
 const double Kd=-0.5395;
-const double Ki=473.9586;
+const double Ki=473.9586;*/
+const double Kp = 5;
+const double Kd = 3;
+const double Ki = 20;
+
 const double tau_d = abs(2000*Kd);
 const double tau =0.01;
 const double a1 = 4*Kd+2*tau_d*Ki*tau+Ki*tau+2*Kp*tau_d+Kp;
 const double a2 = -8*Kd+Ki*tau+2*tau_d*Ki*tau-2*Kp*tau_d+Kp+2*Kp*tau_d+1;
 const double a3 = -4*tau_d+4*Kd;
+const double beta = (tau-2*tau_d)/(2*tau_d + tau);
+const double alpha = 2*Kd/(2*tau_d+tau);
 
 const double b1 = 4*tau_d+2;
 const double b2 = -8*tau_d;
@@ -147,22 +155,26 @@ void loop(){
   
   if(flag){ 
     digitalWrite(out, HIGH);
+    
     readValues();
     getAngles();
     Serial.print("angle : "); Serial.println(kalAngleY);  
     
-    /* ecrire le code d'asservissement ici*/
+    double up;
+    
+    tetam[0] = kalAngleY;
 
-    tetar[0] = kalAngleY;
-    
-    
-    cmd[0] = (-b1*tetar[0]-b2*tetar[1]-b3*tetar[2]-a2*cmd[1]-a3*cmd[2])/a1;
+    up =  tetam[0]*Kp;
+    ui[0] = ui[1]-tetam[0]+Ki*tau/2-ui[1]*Ki*tau/2;
+    ud[0] = beta*ud[1]-alpha*tetam[0]+alpha*tetam[1];
 
+    cmd[0] = up+ui[0]+ud[0];
+    //cmd[0] = (-b1*tetam[0]-b2*tetam[1]-b3*tetam[2]-a2*cmd[1]-a3*cmd[2])/a1;
+
+    tetam[1] = tetam[0];
+    ui[1] = ui[0];
+    ud[1] = ud[0];
     
-    tetar[2] = tetar[1];
-    tetar[1] = tetar[0];
-    cmd[2] = cmd[1];
-    cmd[1] = cmd[0];
     
     
 
@@ -183,11 +195,12 @@ void loop(){
     if (cmd2<-255)
       cmd2=-255;
 
-    Serial.print("apres satu"); Serial.print("\t"); Serial.print(cmd[0]); Serial.print("\t\t"); Serial.println(cmd2);
-    runMotors(cmd[0],cmd2);
+    //Serial.print("apres satu"); Serial.print("\t"); Serial.print(cmd[0]); Serial.print("\t\t"); Serial.println(cmd2);
+    runMotors(cmd2,cmd[0]);
+
 
     digitalWrite(out, LOW);
-    
+      
     flag=false;
   }
   
