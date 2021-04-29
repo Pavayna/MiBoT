@@ -20,6 +20,7 @@
 #define encoderR1 37 // encoder on right motor (yellow wire)
 #define encoderL2 35 // encoder on left motor (white wire)
 #define encoderR2 39 // encoder on right motor (white wire)
+#define out 26 //pin test periode echantillonage
 
 //Hardware serial for UART communication on LoPy
 HardwareSerial mySerial(1);
@@ -47,12 +48,21 @@ double gyroXerror,gyroYerror,gyroZerror;
 volatile double vconsigne=0;
 double ev[3]={0,0,0};
 double tetar[3]={0,0,0};
+float cmd[3] = {0,0,0};
 double etetaSum=0;
 
-const double Kp=4843.8;
-const double Kd=31050;
-const double Ki=23000;
-double cmd=0;
+const double Kp=-20.2617;
+const double Kd=-0.5395;
+const double Ki=473.9586;
+const double tau_d = abs(2000*Kd);
+const double tau =0.01;
+const double a1 = 4*Kd+2*tau_d*Ki*tau+Ki*tau+2*Kp*tau_d+Kp;
+const double a2 = -8*Kd+Ki*tau+2*tau_d*Ki*tau-2*Kp*tau_d+Kp+2*Kp*tau_d+1;
+const double a3 = -4*tau_d+4*Kd;
+
+const double b1 = 4*tau_d+2;
+const double b2 = -8*tau_d;
+const double b3 = 4*tau_d-2;
 
 //other timers
 double chrono;
@@ -84,10 +94,12 @@ void setup(){
   pinMode(encoderL2,INPUT);
   pinMode(encoderR2,INPUT);
   pinMode(battery,INPUT);
-
+  pinMode(out,OUTPUT);
+  
   //setting driver adress
   digitalWrite(ad0, HIGH);
   digitalWrite(ad1, LOW);
+  digitalWrite(out, LOW);
 
   //set encoder position functions
   attachInterrupt(digitalPinToInterrupt(encoderL1), encoderChangeL1, RISING);
@@ -131,12 +143,50 @@ void loop(){
   
   //runMotors(0,70); //runMotor(rightM pwn, leftM pwm)
   //Serial.print(phaseL); Serial.print("\t\t"); Serial.println(phaseR);
-  Serial.print(posL); Serial.print("\t\t"); Serial.println(posR);
-  delay(200);
+  //Serial.print(posL); Serial.print("\t\t"); Serial.println(posR);
+  
   if(flag){ 
-    //Serial.println(millis());
+    digitalWrite(out, HIGH);
+    readValues();
+    getAngles();
+    Serial.print("angle : "); Serial.println(kalAngleY);  
     
     /* ecrire le code d'asservissement ici*/
+
+    tetar[0] = kalAngleY;
+    
+    
+    cmd[0] = (-b1*tetar[0]-b2*tetar[1]-b3*tetar[2]-a2*cmd[1]-a3*cmd[2])/a1;
+
+    
+    tetar[2] = tetar[1];
+    tetar[1] = tetar[0];
+    cmd[2] = cmd[1];
+    cmd[1] = cmd[0];
+    
+    
+
+
+    //saturation
+    float cmd2=(0.724*abs(cmd[0])-3.77+8.38)/0.708;
+    Serial.print("avant satu"); Serial.print("\t"); Serial.print(cmd[0]); Serial.print("\t\t"); Serial.println(cmd2);
+    if (cmd[0]<0)
+      cmd2=-cmd2;
+    //satutation 
+    if (cmd[0]>255)
+      cmd[0]=255;
+    if (cmd[0]<-255)
+      cmd[0]=-255;
+
+    if (cmd2>255)
+      cmd2=255;
+    if (cmd2<-255)
+      cmd2=-255;
+
+    Serial.print("apres satu"); Serial.print("\t"); Serial.print(cmd[0]); Serial.print("\t\t"); Serial.println(cmd2);
+    runMotors(cmd[0],cmd2);
+
+    digitalWrite(out, LOW);
     
     flag=false;
   }
