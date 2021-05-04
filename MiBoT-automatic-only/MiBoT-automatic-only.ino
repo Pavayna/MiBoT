@@ -22,6 +22,9 @@
 #define encoderR2 39 // encoder on right motor (white wire)
 #define out 33 //pin test periode echantillonage
 
+//freq echantill
+float fe =100;  //freq echantill
+
 //Hardware serial for UART communication on LoPy
 HardwareSerial mySerial(1);
 
@@ -83,7 +86,7 @@ double posR=0; //position angulaire roue droite en radian
 double posprecL=0;
 double posprecR=0;
 const double R=0.021;
-
+double vm = 0;
 //timer for automatic control
 hw_timer_t * timerA = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -118,7 +121,7 @@ void setup(){
   //timer for automatic control flag
   timerA = timerBegin(0, 80, true); //prescaler : 80e6/80 = 1e6 (ESP32 : 80MHz)
   timerAttachInterrupt(timerA, &onTime, true);
-  timerAlarmWrite(timerA, 10000, true); //for 100Hz : 100=1e6/1e4     
+  timerAlarmWrite(timerA, 1e6/fe , true);
   timerAlarmEnable(timerA);
 
   //UART communication
@@ -149,11 +152,11 @@ void setup(){
 
 void loop(){
   
-  //runMotors(0,70); //runMotor(rightM pwn, leftM pwm)
+  runMotors(100,100); //runMotor(rightM pwn, leftM pwm)
   //Serial.print(phaseL); Serial.print("\t\t"); Serial.println(phaseR);
   //Serial.print(posL); Serial.print("\t\t"); Serial.println(posR);
   
-  if(flag){ 
+  if(0){ 
     digitalWrite(out, HIGH);
     
     readValues();
@@ -208,6 +211,9 @@ void loop(){
 }
 
 void IRAM_ATTR onTime() {
+   vm = R*(posprecR-posR+posprecL-posprecR)*fe/2;
+   posprecR = posR;
+   posprecL = posL;
    flag=true;
 }
 
@@ -217,6 +223,7 @@ void encoderChangeL1(){
     posL -= 2*PI/(3*150.58); //position angulaire roue gauche en radian
   else
     posL += 2*PI/(3*150.58);
+  
 
 }
 
@@ -225,6 +232,8 @@ void encoderChangeR1(){
     posR += 2*PI/(3*150.58); //position angulaire roue droite en radian
   else
     posR -= 2*PI/(3*150.58);
+    
+  
 
 }
 
@@ -330,7 +339,7 @@ void uartWriteDatagram(uint8_t SLAVEADDR, uint8_t registerAddress,
 
   uint8_t CRC = 0;
   int temp;
-  unsigned char buf[8];
+  
   CRC = NextCRC(CRC, 0x05, CRC8_GEN);
   CRC = NextCRC(CRC, SLAVEADDR, CRC8_GEN);
   CRC = NextCRC(CRC, registerAddress|0x80, CRC8_GEN);  
@@ -339,64 +348,23 @@ void uartWriteDatagram(uint8_t SLAVEADDR, uint8_t registerAddress,
   CRC = NextCRC(CRC, (datagram >> 8) & 0xff, CRC8_GEN);
   CRC = NextCRC(CRC, datagram & 0xff, CRC8_GEN);
   
-  buf[0] = 0x05;
-  buf[1] = SLAVEADDR;
-  buf[2] = registerAddress|0x80;
-  buf[3] = (datagram >> 24) & 0xff;
-  buf[4] = (datagram >> 16) & 0xff;
-  buf[5] = (datagram >> 8) & 0xff;
-  buf[6] = datagram & 0xff; 
-  buf[7] = CRC;
   
-  temp = Serial1.write(buf, 8); //write datagram
-  //Serial1.flush();  //wait until all datas are written
-  Serial1.readBytes(buf, 8); //clear input buffer
-}
-
-unsigned long uartRead(uint8_t SALVEADDR, uint8_t registerAddress) {
-
-  uint8_t CRC = 0, temp;
-  unsigned char buf[8];
-  unsigned long dataBytes;
-
-  CRC = NextCRC(CRC, 0x05, CRC8_GEN);
-  CRC = NextCRC(CRC, SALVEADDR, CRC8_GEN);
-  CRC = NextCRC(CRC, registerAddress, CRC8_GEN);
-  buf[0] = 0x05;
-  buf[1] = SALVEADDR;
-  buf[2] = registerAddress;
-  buf[3] = CRC;
-  Serial1.write(buf, 4); //write datagram
-  //Serial1.flush();  //wait until all datas are written
-  Serial1.readBytes(buf, 4); //clear input buffer
-  
-  Serial1.readBytes(buf, 8);
-  temp = buf[2];
-  dataBytes = buf[3]; //bit 32...24
-  dataBytes <<= 8;
-  dataBytes |= buf[4]; //bit 23...16
-  dataBytes <<= 8;
-  dataBytes |= buf[5]; //bit 15...8
-  dataBytes <<= 8;
-  dataBytes |= buf[6]; //bit 7...0
-  
-  CRC = 0;
-  for(int i=0;i<7;i++)
-  {
-    CRC = NextCRC(CRC, buf[i], CRC8_GEN);
+  if (Serial1.available()){
+    unsigned char buf[8];
+    buf[0] = 0x05;
+    buf[1] = SLAVEADDR;
+    buf[2] = registerAddress|0x80;
+    buf[3] = (datagram >> 24) & 0xff;
+    buf[4] = (datagram >> 16) & 0xff;
+    buf[5] = (datagram >> 8) & 0xff;
+    buf[6] = datagram & 0xff; 
+    //buf[7] = CRC;
+    
+    Serial1.write(buf, 8); //write datagram
+    //Serial1.flush();  //wait until all datas are written
+    //Serial1.readBytes(buf, 8); //clear input buffer
   }
-
-  //show received bytes
-  Serial.print("Received: 0x");
-  for(int i=0;i<8;i++)
-  {
-    char tmp[16];
-    sprintf(tmp, "%.2X", buf[i]);
-    Serial.print(tmp);
+  else{
+    Serial.println("UART not available");
   }
-  Serial.print("\n");
-  Serial.print("CRC: "); Serial.print(CRC,HEX);Serial.print(" <-> BUFFER: "); 
-  Serial.println(buf[7],HEX);
-
-  return dataBytes;
 }
