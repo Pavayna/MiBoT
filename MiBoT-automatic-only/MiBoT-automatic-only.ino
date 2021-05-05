@@ -152,9 +152,18 @@ void setup(){
 
 void loop(){
   
-  runMotors(100,100); //runMotor(rightM pwn, leftM pwm)
+  //runMotors(100,100); //runMotor(rightM pwn, leftM pwm)
   //Serial.print(phaseL); Serial.print("\t\t"); Serial.println(phaseR);
   //Serial.print(posL); Serial.print("\t\t"); Serial.println(posR);
+  for (int i = -255; i<=255; i+=5){
+    runMotors(i,i);
+    float tprec = millis();
+    double pposL = posL;
+    double pposR = posR;
+    delay(1000);
+    Serial.print(i); Serial.print("\t"); Serial.println((-pposL+posL)*1000/((millis() - tprec)/1000)); /*Serial.print("\t"); Serial.println((-pposR+posR)*1000/((millis() - tprec)/1000));*/
+  }
+  delay(60000);
   
   if(0){ 
     digitalWrite(out, HIGH);
@@ -182,21 +191,26 @@ void loop(){
     
 
 
+    
+    float cmd2;
+    if abs(cmd[0])>155
+      cmd2 = 0.922*cmd[0]-238.19;
+    else{
+      if (cmd[0]>0)
+        cmd2 = 0.9567*cmd[0]-991.55;
+      else
+        cmd2 = 0.9943*cmd[0]+497.69;
+    }
+      
     //saturation
-    float cmd2=(0.724*abs(cmd[0])-3.77+8.38)/0.708;
     Serial.print("avant satu"); Serial.print("\t"); Serial.print(cmd[0]); Serial.print("\t\t"); Serial.println(cmd2);
-    if (cmd[0]<0)
-      cmd2=-cmd2;
     //satutation 
     if (cmd[0]>255)
-      cmd[0]=255;
+      cmd[0] = cmd2 = 255;
     if (cmd[0]<-255)
-      cmd[0]=-255;
+      cmd[0] = cmd2 = -255;
 
-    if (cmd2>255)
-      cmd2=255;
-    if (cmd2<-255)
-      cmd2=-255;
+
 
     //Serial.print("apres satu"); Serial.print("\t"); Serial.print(cmd[0]); Serial.print("\t\t"); Serial.println(cmd2);
     runMotors(cmd2,cmd[0]);
@@ -211,7 +225,7 @@ void loop(){
 }
 
 void IRAM_ATTR onTime() {
-   vm = R*(posprecR-posR+posprecL-posprecR)*fe/2;
+   vm = R*(-posprecR+posR-posprecL+posL)*fe/2;
    posprecR = posR;
    posprecL = posL;
    flag=true;
@@ -223,8 +237,6 @@ void encoderChangeL1(){
     posL -= 2*PI/(3*150.58); //position angulaire roue gauche en radian
   else
     posL += 2*PI/(3*150.58);
-  
-
 }
 
 void encoderChangeR1(){
@@ -232,9 +244,6 @@ void encoderChangeR1(){
     posR += 2*PI/(3*150.58); //position angulaire roue droite en radian
   else
     posR -= 2*PI/(3*150.58);
-    
-  
-
 }
 
 
@@ -330,6 +339,21 @@ void runMotors(float pwm_a,float pwm_b){
   int32_t pb=(int)(pwm_b+0.5);
   long int data=((pb<<16)&0xffff0000)|(pa&0x0000ffff);
   uartWriteDatagram(0x01, TMC7300_PWM_AB, data);
+
+  /*uint8_t CRC = 0;
+  if (Serial1.available()){
+    unsigned char buf[8];
+    buf[0] = 0x05;
+    buf[1] = TMC7300_PWM_AB;
+    buf[2] = TMC7300_PWM_AB|0x80;
+    buf[3] = (data >> 24) & 0xff;
+    buf[4] = (data >> 16) & 0xff;
+    buf[5] = (data >> 8) & 0xff;
+    buf[6] = data & 0xff; 
+    buf[7] = CRC;
+    
+    Serial1.write(buf, 8); //write datagram
+  }*/
 }
 
 void uartWriteDatagram(uint8_t SLAVEADDR, uint8_t registerAddress, 
@@ -358,7 +382,7 @@ void uartWriteDatagram(uint8_t SLAVEADDR, uint8_t registerAddress,
     buf[4] = (datagram >> 16) & 0xff;
     buf[5] = (datagram >> 8) & 0xff;
     buf[6] = datagram & 0xff; 
-    //buf[7] = CRC;
+    buf[7] = CRC;
     
     Serial1.write(buf, 8); //write datagram
     //Serial1.flush();  //wait until all datas are written
