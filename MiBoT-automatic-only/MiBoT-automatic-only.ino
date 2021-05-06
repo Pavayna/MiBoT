@@ -186,20 +186,16 @@ void loop(){
     tetam[1] = tetam[0];
     ui[1] = ui[0];
     ud[1] = ud[0];
-    
-    
-    
-
 
     
     float cmd2;
     if abs(cmd[0])>155
-      cmd2 = 0.922*cmd[0]-238.19;
+      cmd2 = 1.08934*cmd[0];
     else{
       if (cmd[0]>0)
-        cmd2 = 0.9567*cmd[0]-991.55;
+        cmd2 = 0.017573*(59.399*cmd[0]-991.35+1948.9;);
       else
-        cmd2 = 0.9943*cmd[0]+497.69;
+        cmd2 = 0.017089*(58.874*cmd[0]+1026.3-1515.8);
     }
       
     //saturation
