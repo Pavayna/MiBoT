@@ -54,9 +54,8 @@ public class MainActivity extends AppCompatActivity {
 
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 float speed;
-                speed=(float)seekBar.getProgress()/500;
-                //reff.child("speed").setValue(speed);
-                speedTxt.setText(Float.toString(speed)+" m/s");
+                speed=(float)seekBar.getProgress()/500; // we want the speed to be between 0 and 0.2 m/s
+                speedTxt.setText(Float.toString(speed)+" m/s"); //set the text that indicates the speed on seekbar's value change
             }
 
             public void onStartTrackingTouch(SeekBar seekBar) {
@@ -71,8 +70,8 @@ public class MainActivity extends AppCompatActivity {
         reset.setOnClickListener(new View.OnClickListener(){
             public void onClick(View view){
                 seekBar.setProgress(0);
-                reff.child("speed").setValue(0);
-                speedTxt.setText("0 m/s");
+                reff.child("speed").setValue(0); //write 0 for speed in database
+                speedTxt.setText("0 m/s"); 
             }
         });
 
@@ -95,9 +94,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        reff.child("battery").addValueEventListener(new ValueEventListener() {
+        reff.child("battery").addValueEventListener(new ValueEventListener() { 
             @Override
-            public void onDataChange(DataSnapshot snapshot) {
+            public void onDataChange(DataSnapshot snapshot) { //read the battery level of the robot if its value changes
                 String battery;
                 System.out.println(snapshot.getValue());
                 battery=snapshot.getValue().toString();
